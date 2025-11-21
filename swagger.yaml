@@ -8,99 +8,104 @@ info:
 
 servers:
   - url: http://127.0.0.1:8000/api
-    description: Local Laravel API Server
+    description: Local development server (use for local Swagger Editor)
+  - url: https://<your-ngrok-id>.ngrok.io
+    description: ngrok HTTPS tunnel (replace <your-ngrok-id> with actual id)
+
+tags:
+  - name: Books
+    description: Endpoints to search and list Project Gutenberg books
 
 paths:
   /books:
     get:
-      summary: List books with filters
-      description: |
-        Returns a paginated list of books matching the given filters.
-        Supports multiple values (comma-separated) per filter.
-        Results are sorted by download_count in descending order.
       tags:
         - Books
-
+      summary: List books with filters
+      description: >
+        Returns a paginated list of books matching the given filters.
+        Supports multiple values per filter via CSV (comma-separated values).
+        Results are sorted by download_count in descending order.
       parameters:
         - name: ids
           in: query
-          required: false
           description: >
-            Comma-separated list of Gutenberg book IDs.
-            Example: ids=11,12,13
+            Comma-separated list of Gutenberg book IDs. Example: ids=11,12,13
+          required: false
           schema:
             type: string
             example: "11,12,13"
 
         - name: language
           in: query
-          required: false
           description: >
-            Comma-separated list of language codes.
-            Example: language=en,fr
+            Comma-separated list of language codes. Example: language=en,fr
+          required: false
           schema:
             type: string
             example: "en,fr"
 
         - name: mime_type
           in: query
-          required: false
           description: >
-            Comma-separated MIME type prefixes.
-            Example: text/,application/pdf
+            Comma-separated MIME type prefixes. Example: mime_type=text/,application/pdf
+          required: false
           schema:
             type: string
             example: "text/,application/pdf"
 
         - name: topic
           in: query
-          required: false
           description: >
-            Comma-separated keywords checked (case-insensitive)
-            against subjects and bookshelves.
+            Comma-separated keywords checked (case-insensitive) against subjects and bookshelves.
             Example: topic=child,infant
+          required: false
           schema:
             type: string
             example: "child,infant"
 
         - name: author
           in: query
-          required: false
           description: >
             Comma-separated partial author name matches.
             Example: author=austen,dickens
+          required: false
           schema:
             type: string
             example: "austen,dickens"
 
         - name: title
           in: query
-          required: false
           description: >
             Comma-separated partial book title matches.
             Example: title=pride,war
+          required: false
           schema:
             type: string
             example: "pride,war"
 
         - name: page
           in: query
+          description: >
+            Page number (1-based index)
           required: false
           schema:
             type: integer
             minimum: 1
             default: 1
-          description: Page number (1-based index)
+            example: 1
 
         - name: page_size
           in: query
+          description: >
+            Page size (maximum allowed = 25)
           required: false
           schema:
             type: integer
             minimum: 1
             maximum: 25
             default: 25
-          description: Maximum allowed = 25
+            example: 25
 
       responses:
         '200':
@@ -109,7 +114,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BookListResponse'
-
               example:
                 total: 1500
                 page: 1
@@ -133,14 +137,68 @@ paths:
                         url: "https://www.gutenberg.org/ebooks/1342.html.images"
                       - mime_type: "application/pdf"
                         url: "https://www.gutenberg.org/ebooks/1342.pdf"
-
         '400':
-          description: Bad Request
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/ValidationError'
         '500':
-          description: Internal Server Error
+          $ref: '#/components/responses/InternalServerError'
 
 components:
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: "Malformed request"
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+          example:
+            message: "Validation failed"
+            errors:
+              page:
+                - "page must be >= 1"
+              page_size:
+                - "page_size must be <= 25"
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: "An unexpected error occurred"
+
   schemas:
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+      required:
+        - message
+        - errors
 
     BookFormat:
       type: object
@@ -152,9 +210,16 @@ components:
           type: string
           format: uri
           example: "https://www.gutenberg.org/ebooks/1342.html.images"
+      required:
+        - mime_type
+        - url
 
     Book:
       type: object
+      required:
+        - id
+        - title
+        - download_count
       properties:
         id:
           type: integer
@@ -214,3 +279,5 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Book'
+
+security: []
